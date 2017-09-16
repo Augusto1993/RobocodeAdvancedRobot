@@ -1,4 +1,4 @@
-package jb;
+package test;
 import robocode.*;
 import java.awt.Color;
 import java.awt.geom.*;
