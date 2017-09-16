@@ -52,7 +52,7 @@ public class BadgeBot extends AdvancedRobot {
 
 		targetBot = new Robot();
 
-		while (true) {
+		while (true) {	
 			me.x = getX();
 			me.y = getY();
 			me.energy = getEnergy();

@@ -1,4 +1,4 @@
-package test;
+package testerRobots;
 import robocode.*;
 import java.awt.Color;
 import java.awt.geom.*;

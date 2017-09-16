@@ -9,7 +9,7 @@ public class Utility {
 	}
 
 	public static double randomBetween(double min, double max) {
-		return min + (Math.random() * ((max - min) + 1));
+		return min + Math.random() * (max - min);
 	}
 	
 	public static double calcAngle(Point2D.Double p1, Point2D.Double p2) {
