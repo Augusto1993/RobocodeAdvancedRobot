@@ -4,8 +4,8 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.Hashtable;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 import robocode.AdvancedRobot;
@@ -17,20 +17,21 @@ import robocode.util.Utils;
 
 public class BadgeBot extends AdvancedRobot {
 
-	// Static variables or objects in robocode keep their data from round to round
+	// Static variables or objects in robocode keep their data from round to
+	// round
 
 	static final int PREDICTION_POINTS = 150;
 
 	static int[] finishes;
-	Hashtable<String, Robot> enemies = new Hashtable<>();
-	
+	HashMap<String, Robot> enemies = new HashMap<>();
+
 	Robot me = new Robot();
 	Robot targetBot;
-	
-	List<Point2D.Double> possibleLocations = new ArrayList<>();
-	Point2D.Double targetPoint = new Point2D.Double(0, 0);
 
-	int idleTime = 0;	
+	List<Point2D.Double> possibleLocations = new ArrayList<>();
+	Point2D.Double targetPoint = new Point2D.Double(60, 60);
+
+	int idleTime = 30;
 
 	public void run() {
 		if (finishes == null)
@@ -52,23 +53,40 @@ public class BadgeBot extends AdvancedRobot {
 
 		targetBot = new Robot();
 
-		while (true) {	
+		while (true) {
 			me.x = getX();
 			me.y = getY();
 			me.energy = getEnergy();
 			me.gunHeadingRadians = getGunHeadingRadians();
+
+			// Once the robot scans once and sees other robots start moving and
+			// shooting
 			if (getTime() > 9) {
 				if (targetBot.alive) {
 					movement();
 					shooting();
 				}
 			}
-			Enumeration<Robot> enemiesEnum = enemies.elements();
-			while (enemiesEnum.hasMoreElements()) {
-				Robot r = enemiesEnum.nextElement();
+			// If the robot isnt scanned in 20 turns get rid of it because all
+			// the data is old and outdated
+			Iterator<Robot> enemiesIter = enemies.values().iterator();
+			List<String> keysToRemove = new ArrayList();
+			while (enemiesIter.hasNext()) {
+				Robot r = enemiesIter.next();
 				if (getTime() - r.scanTime > 20) {
-					enemies.remove(r.name);
+					keysToRemove.add(r.name);
 				}
+			}
+			for (String key : keysToRemove) {
+				if(targetBot.name == key){
+					while (enemiesIter.hasNext()) {
+						targetBot = null;
+						Robot r = enemiesIter.next();
+						if(targetBot == null || targetBot.distance(me) > r.distance(me))
+							targetBot = r;
+					}
+				}
+				enemies.remove(key);
 			}
 			execute();
 		}
@@ -83,6 +101,7 @@ public class BadgeBot extends AdvancedRobot {
 			en = new Robot();
 			enemies.put(e.getName(), en);
 		}
+		// Setting/Updating enemy variables
 		en.name = e.getName();
 		en.energy = e.getEnergy();
 		en.alive = true;
@@ -97,7 +116,7 @@ public class BadgeBot extends AdvancedRobot {
 		// Gotta kill those ram fires
 		// If the target I was shooting at died switch to a new one or if a new
 		// challenger has appeared 10% closer
-		if (!targetBot.alive || e.getDistance() * 0.9 < me.distance(targetBot))
+		if (!targetBot.alive || en.distance(me) * 0.9 < me.distance(targetBot))
 			targetBot = en;
 
 		// LOGIC NEEDED FOR 1v1 SUPER SAYAN MODE ACTIVATE
@@ -108,46 +127,63 @@ public class BadgeBot extends AdvancedRobot {
 	}
 
 	public void onRobotDeath(RobotDeathEvent event) {
+		// If a robot is dead we need to know
 		if (enemies.containsKey(event.getName())) {
 			enemies.get(event.getName()).alive = false;
 		}
 	}
 
 	public void shooting() {
-		double POWER = Math.min(targetBot.energy/3d, 1000d/targetBot.distance(me));
-		double angle = Utils.normalRelativeAngle(Utility.calcAngle(targetBot, me) - getGunHeadingRadians());
-		if (getGunTurnRemaining() == 0 && getEnergy() > 6.10 && getGunHeat() == 0) {
-			setFire(POWER);
+		// It works I guess
+		double dist = me.distance(targetBot);
+		double power = ( dist > 850 ? 0.1 : (dist > 700 ? 0.49 : (dist > 250 ? 1.9 : 3.0)));
+		power = Math.min( getEnergy()/5, Math.min( (targetBot.energy/4) + 0.2, power));
+		// Heads on Targeting
+		double angle = Utils.normalRelativeAngle(Utility.calcAngle(me, targetBot) - getGunHeadingRadians());
+		// If we are ready to fire the gun, FIRE
+		if (getGunTurnRemaining() == 0 && getEnergy() > 6.10 && getGunHeat() == 0 && targetBot.alive) {
+			setFire(power);
 		}
+		// Turn after shooting so that there it no infinite cycle of
+		// getGunTurnRemaining() never being 0
 		setTurnGunRightRadians(angle);
 	}
 
 	public void movement() {
 		if (targetPoint.distance(me) < 15 || idleTime > 25) {
+			// Reset idle time, I'm at my location or took too long to get there
 			idleTime = 0;
+			// Get a new array of points
 			updateListLocations(PREDICTION_POINTS);
-			// WE ARE HERE NEW POINT
+
+			// Lowest Risk Point
 			Point2D.Double lowRiskP = null;
-			double risk = Double.MAX_VALUE;
+			// Current Risk Value
+			double lowestRisk = Double.MAX_VALUE;
 			for (Point2D.Double p : possibleLocations) {
-				if (evaluatePoint(p) <= risk || lowRiskP == null) {
-					risk = evaluatePoint(p);
+				// Make sure that if lowRiskP is not assigned yet give it a new
+				// value no matter what
+				double currentRisk = evaluatePoint(p);
+				if (currentRisk <= lowestRisk || lowRiskP == null) {
+					lowestRisk = currentRisk;
 					lowRiskP = p;
 				}
 			}
 			targetPoint = lowRiskP;
 		} else {
+			// Increase idle time if still not at position
 			idleTime++;
 			// GO TO POINT
-			double angle = Math.atan2(targetPoint.x - me.x, targetPoint.y - me.y) - getHeadingRadians();
+			double angle = Utility.calcAngle(me, targetPoint) - getHeadingRadians();
 			double direction = 1;
-
 			if (Math.cos(angle) < 0) {
 				angle += Math.PI;
-				direction = -1;
+				direction *= -1;
 			}
-
-			setAhead(targetPoint.distance(me) * direction);
+			// If Math.cos(angle) is negative its faster to go backwards and
+			// turn than going forwards and turning much more
+			setMaxVelocity( 10 - (4 * Math.abs(getTurnRemainingRadians())));
+			setAhead(me.distance(targetPoint) * direction);
 			angle = Utils.normalRelativeAngle(angle);
 			setTurnRightRadians(angle);
 		}
@@ -168,13 +204,23 @@ public class BadgeBot extends AdvancedRobot {
 	}
 
 	public double evaluatePoint(Point2D.Double p) {
-		Enumeration<Robot> _enum = enemies.elements();
+		double botangle = Utils.normalRelativeAngle( Utility.calcAngle(p, targetBot) - Utility.calcAngle(me, p));
+		Iterator<Robot> enemiesIter = enemies.values().iterator();
 		// You don't want to stay in one spot. Antigrav from starting point as
 		// init value to enhance movement.
-		double eval = Utility.randomBetween(0, 0.075) / p.distanceSq(me);
-		while (_enum.hasMoreElements()) {
-			Robot en = _enum.nextElement();
-			eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
+		double eval = Utility.randomBetween(1, 1.075) / p.distanceSq(me);
+		
+		//PRESET ANTIGRAV POINTS
+		//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
+		eval += getOthers()-1==0?0:3 / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
+		eval += 3 / p.distanceSq( 0, 0);
+		eval += 3 / p.distanceSq( getBattleFieldWidth(), 0);
+		eval += 3 / p.distanceSq( 0, getBattleFieldHeight());
+		eval += 3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
+		
+		while (enemiesIter.hasNext()) {
+			Robot en = enemiesIter.next();
+			eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) + Math.abs(Math.cos(botangle))) / 2) * (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
 		}
 		return eval;
 	}
