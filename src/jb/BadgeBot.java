@@ -178,7 +178,7 @@ public class BadgeBot extends AdvancedRobot {
 				direction *= -1;
 			}
 			// If Math.cos(angle) is negative its faster to go backwards and
-			// turn than going forwards and turning much more
+			// turn than going forwards and turn much more
 			setMaxVelocity( 10 - (4 * Math.abs(getTurnRemainingRadians())));
 			setAhead(me.distance(targetPoint) * direction);
 			angle = Utils.normalRelativeAngle(angle);
