@@ -52,6 +52,7 @@ public class BadgeBot extends AdvancedRobot {
 		updateListLocations(PREDICTION_POINTS);
 
 		targetBot = new Robot();
+		targetBot.alive = false;
 
 		while (true) {
 			me.x = getX();
@@ -59,35 +60,27 @@ public class BadgeBot extends AdvancedRobot {
 			me.energy = getEnergy();
 			me.gunHeadingRadians = getGunHeadingRadians();
 
+			// If the robot isn't scanned in 20 turns get rid of it because all
+			// the data is old and outdated
+			Iterator<Robot> enemiesIter = enemies.values().iterator();
+				while (enemiesIter.hasNext()) {
+					Robot r = enemiesIter.next();
+					if (getTime() - r.scanTime > 20) {
+						//If the information is not updated lets just assume its dead so we don't shoot at it
+						r.alive = false;
+						if(r.name.equals(targetBot.name))
+							targetBot.alive = false;
+					}
+				}			
+			
 			// Once the robot scans once and sees other robots start moving and
 			// shooting
 			if (getTime() > 9) {
-				if (targetBot.alive) {
-					movement();
+				movement();
+				if (targetBot.alive)
 					shooting();
-				}
 			}
-			// If the robot isnt scanned in 20 turns get rid of it because all
-			// the data is old and outdated
-			Iterator<Robot> enemiesIter = enemies.values().iterator();
-			List<String> keysToRemove = new ArrayList();
-			while (enemiesIter.hasNext()) {
-				Robot r = enemiesIter.next();
-				if (getTime() - r.scanTime > 20) {
-					keysToRemove.add(r.name);
-				}
-			}
-			for (String key : keysToRemove) {
-				if(targetBot.name == key){
-					while (enemiesIter.hasNext()) {
-						targetBot = null;
-						Robot r = enemiesIter.next();
-						if(targetBot == null || targetBot.distance(me) > r.distance(me))
-							targetBot = r;
-					}
-				}
-				enemies.remove(key);
-			}
+			
 			execute();
 		}
 	}
@@ -112,41 +105,45 @@ public class BadgeBot extends AdvancedRobot {
 						me.y + e.getDistance() * Math.cos(getHeadingRadians() + e.getBearingRadians())));
 		en.heading = e.getHeadingRadians();
 		en.bearingRadians = e.getBearingRadians();
-
+		en.shootableScore = en.energy < 25 ? en.energy < 5 ? en.distance(me) * 0.1 : en.distance(me) * 0.75 : en.distance(me);
+		
 		// Gotta kill those ram fires
 		// If the target I was shooting at died switch to a new one or if a new
 		// challenger has appeared 10% closer
-		if (!targetBot.alive || en.distance(me) * 0.9 < me.distance(targetBot))
+		if (!targetBot.alive || en.shootableScore < targetBot.shootableScore)
 			targetBot = en;
-
 		// LOGIC NEEDED FOR 1v1 SUPER SAYAN MODE ACTIVATE
 		if (getOthers() == 1) {
 			// Nano Bot Lock - Very Simple
 			setTurnRadarLeftRadians(getRadarTurnRemainingRadians());
 		}
 	}
-
+	
 	public void onRobotDeath(RobotDeathEvent event) {
 		// If a robot is dead we need to know
 		if (enemies.containsKey(event.getName())) {
 			enemies.get(event.getName()).alive = false;
 		}
+		if(event.getName().equals(targetBot.name))
+			targetBot.alive = false;
 	}
 
 	public void shooting() {
-		// It works I guess
-		double dist = me.distance(targetBot);
-		double power = ( dist > 850 ? 0.1 : (dist > 700 ? 0.49 : (dist > 250 ? 1.9 : 3.0)));
-		power = Math.min( getEnergy()/5, Math.min( (targetBot.energy/4) + 0.2, power));
-		// Heads on Targeting
-		double angle = Utils.normalRelativeAngle(Utility.calcAngle(me, targetBot) - getGunHeadingRadians());
-		// If we are ready to fire the gun, FIRE
-		if (getGunTurnRemaining() == 0 && getEnergy() > 6.10 && getGunHeat() == 0 && targetBot.alive) {
-			setFire(power);
+		if(targetBot != null && targetBot.alive){
+			// It works I guess
+			double dist = me.distance(targetBot);
+			double power = ( dist > 850 ? 0.1 : (dist > 700 ? 0.49 : (dist > 250 ? 1.9 : 3.0)));
+			power = Math.min( me.energy/5, Math.min( (targetBot.energy/4) + 0.2, power));
+			// Heads on Targeting
+			double angle = Utils.normalRelativeAngle(Utility.calcAngle(me, targetBot) - getGunHeadingRadians());
+			// If we are ready to fire the gun, FIRE
+			if (getGunTurnRemaining() == 0 && getEnergy() > 5.0 && getGunHeat() == 0) {
+				setFire(power);
+			}
+			// Turn after shooting so that there it no infinite cycle of
+			// getGunTurnRemaining() never being 0
+			setTurnGunRightRadians(angle);
 		}
-		// Turn after shooting so that there it no infinite cycle of
-		// getGunTurnRemaining() never being 0
-		setTurnGunRightRadians(angle);
 	}
 
 	public void movement() {
@@ -204,25 +201,61 @@ public class BadgeBot extends AdvancedRobot {
 	}
 
 	public double evaluatePoint(Point2D.Double p) {
-		double botangle = Utils.normalRelativeAngle( Utility.calcAngle(p, targetBot) - Utility.calcAngle(me, p));
-		Iterator<Robot> enemiesIter = enemies.values().iterator();
-		// You don't want to stay in one spot. Antigrav from starting point as
-		// init value to enhance movement.
-		double eval = Utility.randomBetween(1, 1.075) / p.distanceSq(me);
-		
-		//PRESET ANTIGRAV POINTS
-		//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
-		eval += getOthers()-1==0?0:3 / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
-		eval += 3 / p.distanceSq( 0, 0);
-		eval += 3 / p.distanceSq( getBattleFieldWidth(), 0);
-		eval += 3 / p.distanceSq( 0, getBattleFieldHeight());
-		eval += 3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
-		
-		while (enemiesIter.hasNext()) {
-			Robot en = enemiesIter.next();
-			eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) + Math.abs(Math.cos(botangle))) / 2) * (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
+		if(targetBot.alive){
+			double botangle = Utils.normalRelativeAngle( Utility.calcAngle(p, targetBot) - Utility.calcAngle(me, p));
+			Iterator<Robot> enemiesIter = enemies.values().iterator();
+			// You don't want to stay in one spot. Antigrav from starting point as
+			// init value to enhance movement.
+			double eval = Utility.randomBetween(1, 1.075) / p.distanceSq(me);
+			
+			//PRESET ANTIGRAV POINTS
+			//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
+			eval += (getOthers()-1) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
+			eval += 3 / p.distanceSq( 0, 0);
+			eval += 3 / p.distanceSq( getBattleFieldWidth(), 0);
+			eval += 3 / p.distanceSq( 0, getBattleFieldHeight());
+			eval += 3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
+			
+			while (enemiesIter.hasNext()) {
+				Robot en = enemiesIter.next();
+				eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) + Math.abs(Math.cos(botangle))) / 2) * (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
+			}
+			return eval;
+		} else if(enemies.values().size() >= 1) {
+			Iterator<Robot> enemiesIter = enemies.values().iterator();
+			// You don't want to stay in one spot. Antigrav from starting point as
+			// init value to enhance movement.
+			double eval = Utility.randomBetween(1, 1.075) / p.distanceSq(me);
+			
+			//PRESET ANTIGRAV POINTS
+			//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
+			eval += (getOthers()-1) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
+			eval += 3 / p.distanceSq( 0, 0);
+			eval += 3 / p.distanceSq( getBattleFieldWidth(), 0);
+			eval += 3 / p.distanceSq( 0, getBattleFieldHeight());
+			eval += 3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
+			
+			while (enemiesIter.hasNext()) {
+				Robot en = enemiesIter.next();
+				eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
+			}
+			return eval;
+		} else {
+			// You don't want to stay in one spot. Antigrav from starting point as
+			// init value to enhance movement.
+			double eval = Utility.randomBetween(1, 1.075) / p.distanceSq(me);
+			
+			//PRESET ANTIGRAV POINTS
+			//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
+			eval += (getOthers()-1) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
+			eval += 3 / p.distanceSq( 0, 0);
+			eval += 3 / p.distanceSq( getBattleFieldWidth(), 0);
+			eval += 3 / p.distanceSq( 0, getBattleFieldHeight());
+			eval += 3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
+			
+			eval += (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
+			return eval;
 		}
-		return eval;
 	}
 
 	public double[] normalizeRisk(double[] arr) {
