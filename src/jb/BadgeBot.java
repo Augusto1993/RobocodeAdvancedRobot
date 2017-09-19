@@ -230,10 +230,10 @@ public class BadgeBot extends AdvancedRobot {
 			//PRESET ANTIGRAV POINTS
 			//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
 			eval += (getOthers()-1) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
-			eval += 3 / p.distanceSq( 0, 0);
-			eval += 3 / p.distanceSq( getBattleFieldWidth(), 0);
-			eval += 3 / p.distanceSq( 0, getBattleFieldHeight());
-			eval += 3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, 0);
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), 0);
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, getBattleFieldHeight());
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
 			
 			while (enemiesIter.hasNext()) {
 				Robot en = enemiesIter.next();
@@ -248,10 +248,10 @@ public class BadgeBot extends AdvancedRobot {
 			//PRESET ANTIGRAV POINTS
 			//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
 			eval += (getOthers()-1) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
-			eval += 3 / p.distanceSq( 0, 0);
-			eval += 3 / p.distanceSq( getBattleFieldWidth(), 0);
-			eval += 3 / p.distanceSq( 0, getBattleFieldHeight());
-			eval += 3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, 0);
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), 0);
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, getBattleFieldHeight());
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
 			
 			eval += (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
 			return eval;
