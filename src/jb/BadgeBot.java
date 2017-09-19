@@ -100,16 +100,15 @@ public class BadgeBot extends AdvancedRobot {
 		en.alive = true;
 		en.scanTime = getTime();
 		en.velocity = e.getVelocity();
-		en.setLocation(
-				new Point2D.Double(me.x + e.getDistance() * Math.sin(getHeadingRadians() + e.getBearingRadians()),
-						me.y + e.getDistance() * Math.cos(getHeadingRadians() + e.getBearingRadians())));
-		en.heading = e.getHeadingRadians();
 		en.bearingRadians = e.getBearingRadians();
+		en.setLocation(
+				new Point2D.Double(me.x + e.getDistance() * Math.sin(getHeadingRadians() + en.bearingRadians),
+						me.y + e.getDistance() * Math.cos(getHeadingRadians() + en.bearingRadians)));
+		en.heading = e.getHeadingRadians();
 		en.shootableScore = en.energy < 25 ? en.energy < 5 ? en.distance(me) * 0.1 : en.distance(me) * 0.75 : en.distance(me);
 		
-		// Gotta kill those ram fires
 		// If the target I was shooting at died switch to a new one or if a new
-		// challenger has appeared 10% closer
+		// challenger has a lower shootableScore
 		if (!targetBot.alive || en.shootableScore < targetBot.shootableScore)
 			targetBot = en;
 		// LOGIC NEEDED FOR 1v1 SUPER SAYAN MODE ACTIVATE
@@ -201,58 +200,37 @@ public class BadgeBot extends AdvancedRobot {
 	}
 
 	public double evaluatePoint(Point2D.Double p) {
+		// You don't want to stay in one spot. Antigrav from starting point as
+		// init value to enhance movement.
+		double eval = Utility.randomBetween(1, 1.5) / p.distanceSq(me);
+		//PRESET ANTIGRAV POINTS
+		//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
+		eval += (getOthers()-1.5) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
+		eval += (getOthers() <= 5 ? getOthers() == 1 ? 5 : -0.5 : -1) / p.distanceSq(0, 0);
+		eval += (getOthers() <= 5 ? getOthers() == 1 ? 5 : -0.5 : -1) / p.distanceSq(getBattleFieldWidth(), 0);
+		eval += (getOthers() <= 5 ? getOthers() == 1 ? 5 : -0.5 : -1) / p.distanceSq(0, getBattleFieldHeight());
+		eval += (getOthers() <= 5 ? getOthers() == 1 ? 5 : -0.5 : -1) / p.distanceSq(getBattleFieldWidth(), getBattleFieldHeight());
+		
 		if(targetBot.alive){
 			double botangle = Utils.normalRelativeAngle( Utility.calcAngle(p, targetBot) - Utility.calcAngle(me, p));
 			Iterator<Robot> enemiesIter = enemies.values().iterator();
-			// You don't want to stay in one spot. Antigrav from starting point as
-			// init value to enhance movement.
-			double eval = Utility.randomBetween(1, 1.075) / p.distanceSq(me);
-			
-			//PRESET ANTIGRAV POINTS
-			//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
-			eval += (getOthers()-1) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, 0);
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), 0);
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, getBattleFieldHeight());
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
-			
 			while (enemiesIter.hasNext()) {
 				Robot en = enemiesIter.next();
+				//(1 / p.distanceSq(en)) AntiGrav stuff
+				//(en.energy / me.energy) How dangerous a robot it
+				//(1.0 + ((1 - (Math.abs(Math.sin(botangle)))) + Math.abs(Math.cos(botangle))) / 2) Better to move perpendicular to the target bot
+				//(1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians())) If my heading is pointing towards the enemy its bad
 				eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) + Math.abs(Math.cos(botangle))) / 2) * (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
 			}
 			return eval;
 		} else if(enemies.values().size() >= 1) {
 			Iterator<Robot> enemiesIter = enemies.values().iterator();
-			// You don't want to stay in one spot. Antigrav from starting point as
-			// init value to enhance movement.
-			double eval = Utility.randomBetween(1, 1.075) / p.distanceSq(me);
-			
-			//PRESET ANTIGRAV POINTS
-			//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
-			eval += (getOthers()-1) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, 0);
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), 0);
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, getBattleFieldHeight());
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
-			
 			while (enemiesIter.hasNext()) {
 				Robot en = enemiesIter.next();
 				eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
 			}
 			return eval;
 		} else {
-			// You don't want to stay in one spot. Antigrav from starting point as
-			// init value to enhance movement.
-			double eval = Utility.randomBetween(1, 1.075) / p.distanceSq(me);
-			
-			//PRESET ANTIGRAV POINTS
-			//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
-			eval += (getOthers()-1) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, 0);
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), 0);
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, getBattleFieldHeight());
-			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
-			
 			eval += (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
 			return eval;
 		}
