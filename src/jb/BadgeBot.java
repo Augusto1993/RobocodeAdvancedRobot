@@ -211,10 +211,10 @@ public class BadgeBot extends AdvancedRobot {
 			//PRESET ANTIGRAV POINTS
 			//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
 			eval += (getOthers()-1) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
-			eval += 3 / p.distanceSq( 0, 0);
-			eval += 3 / p.distanceSq( getBattleFieldWidth(), 0);
-			eval += 3 / p.distanceSq( 0, getBattleFieldHeight());
-			eval += 3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, 0);
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), 0);
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( 0, getBattleFieldHeight());
+			eval += getOthers() <= 5 ? getOthers() == 1 ? 1 : 3 : -3 / p.distanceSq( getBattleFieldWidth(), getBattleFieldHeight());
 			
 			while (enemiesIter.hasNext()) {
 				Robot en = enemiesIter.next();
@@ -278,7 +278,7 @@ public class BadgeBot extends AdvancedRobot {
 		risks = normalizeRisk(risks);
 		for (int i = 0; i < risks.length; i++) {
 			Point2D.Double p = possibleLocations.get(i);
-			double cChange = risks[i];
+			double cChange = Utility.clamp(risks[i],0,1);
 			g.setColor(new Color((float) (1 * cChange), 0f, (float) (1 * (1 - cChange)), 1f));
 			g.drawOval((int) p.x, (int) p.y, 5, 5);
 		}
@@ -286,7 +286,7 @@ public class BadgeBot extends AdvancedRobot {
 			if (!e.alive)
 				g.setColor(new Color(0, 0, 0, 0));
 			else
-				g.setColor(new Color(0xff, 0x00, 0x00, 0x80));
+				g.setColor(new Color(255,50,0,255/2));
 			g.drawRect((int) (e.x - 25), (int) (e.y - 25), 50, 50);
 		}
 		g.fillRect((int) targetPoint.x - 20, (int) targetPoint.y - 20, 40, 40);
