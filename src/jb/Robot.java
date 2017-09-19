@@ -12,6 +12,7 @@ public class Robot extends Point2D.Double {
 	public double bearingRadians;
 	public double velocity;
 	public double heading;
-	public double shootableScore;
+	public double lastHeading;
+	public double shootableScore;	
 
 }

@@ -3,6 +3,7 @@ package jb;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -11,6 +12,7 @@ import java.util.List;
 import robocode.AdvancedRobot;
 import robocode.DeathEvent;
 import robocode.RobotDeathEvent;
+import robocode.Rules;
 import robocode.ScannedRobotEvent;
 import robocode.WinEvent;
 import robocode.util.Utils;
@@ -95,6 +97,7 @@ public class BadgeBot extends AdvancedRobot {
 			enemies.put(e.getName(), en);
 		}
 		// Setting/Updating enemy variables
+		en.lastHeading = en.heading;
 		en.name = e.getName();
 		en.energy = e.getEnergy();
 		en.alive = true;
@@ -131,17 +134,54 @@ public class BadgeBot extends AdvancedRobot {
 		if(targetBot != null && targetBot.alive){
 			// It works I guess
 			double dist = me.distance(targetBot);
-			double power = ( dist > 850 ? 0.1 : (dist > 700 ? 0.49 : (dist > 250 ? 1.9 : 3.0)));
-			power = Math.min( me.energy/5, Math.min( (targetBot.energy/4) + 0.2, power));
+			double power = ( dist > 850 ? 0.1 : (dist > 700 ? 0.5 : (dist > 250 ? 2.0 : 3.0)));
+			power = Math.min( me.energy/4d, Math.min(targetBot.energy/3d, power));
 			// Heads on Targeting
-			double angle = Utils.normalRelativeAngle(Utility.calcAngle(me, targetBot) - getGunHeadingRadians());
-			// If we are ready to fire the gun, FIRE
-			if (getGunTurnRemaining() == 0 && getEnergy() > 5.0 && getGunHeat() == 0) {
-				setFire(power);
+//			double angle = Utils.normalRelativeAngle(Utility.calcAngle(me, targetBot) - getGunHeadingRadians());
+//			// If we are ready to fire the gun, FIRE
+//			if (getGunTurnRemaining() == 0 && me.energy > 5.0 && getGunHeat() == 0) {
+//				setFire(power);
+//			}
+//			// Turn after shooting so that there it no infinite cycle of
+//			// getGunTurnRemaining() never being 0
+//			setTurnGunRightRadians(angle);
+			
+			// perform lineair and circular targeting
+			long deltahittime;
+			Point2D.Double point = new Point2D.Double();
+			double head, chead, bspeed;
+			double tmpx, tmpy;
+
+			// perform an iteration to find a reasonable accurate expected position
+			tmpx = targetBot.getX();
+			tmpy = targetBot.getY();
+			head = targetBot.heading;
+			chead = head - targetBot.lastHeading;
+			point.setLocation( tmpx, tmpy);
+			deltahittime = 0;
+			do {
+				tmpx += Math.sin(head) * targetBot.velocity;
+				tmpy +=	Math.cos(head) * targetBot.velocity;
+				head += chead;
+				deltahittime++;
+				Rectangle2D.Double fireField = new Rectangle2D.Double(20, 20, getBattleFieldWidth()- 20, getBattleFieldHeight() - 20);
+				// if position not in field, adapt
+				if (!fireField.contains( tmpx, tmpy)) {
+					bspeed = point.distance(me) / deltahittime;
+					power = Math.max( Math.min( (20 - bspeed) / 3.0, 3.0), 0.1);
+					break;
+				}
+				point.setLocation( tmpx, tmpy);
+			} while ( (int)Math.round( (point.distance( me) - 18) / Rules.getBulletSpeed( power)) > deltahittime);
+			point.setLocation( Math.min( getBattleFieldWidth()  - 34, Math.max( 34, tmpx)), Math.min( getBattleFieldHeight() - 34, Math.max( 34, tmpy)));
+			
+			// If the gun is too hot or not aligned, don't bother trying to fire.
+			if ((getGunHeat() == 0.0) && (getGunTurnRemaining() == 0.0) && (power > 0.0) && (getEnergy() > 0.1)) {
+				// Only fire the gun when it is locked and loaded, do a radarsweep afterwards.
+				setFire( power);
 			}
-			// Turn after shooting so that there it no infinite cycle of
-			// getGunTurnRemaining() never being 0
-			setTurnGunRightRadians(angle);
+			// Turn gun after eventual firing (robocode does it also this way)
+			setTurnGunRightRadians( Utils.normalRelativeAngle(((Math.PI / 2) - Math.atan2( point.y - me.getY(), point.x - me.getX())) - getGunHeadingRadians()));
 		}
 	}
 
@@ -205,11 +245,12 @@ public class BadgeBot extends AdvancedRobot {
 		double eval = Utility.randomBetween(1, 1.5) / p.distanceSq(me);
 		//PRESET ANTIGRAV POINTS
 		//If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
-		eval += (getOthers()-1.5) / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
-		eval += (getOthers() <= 5 ? getOthers() == 1 ? 5 : -0.5 : -1) / p.distanceSq(0, 0);
-		eval += (getOthers() <= 5 ? getOthers() == 1 ? 5 : -0.5 : -1) / p.distanceSq(getBattleFieldWidth(), 0);
-		eval += (getOthers() <= 5 ? getOthers() == 1 ? 5 : -0.5 : -1) / p.distanceSq(0, getBattleFieldHeight());
-		eval += (getOthers() <= 5 ? getOthers() == 1 ? 5 : -0.5 : -1) / p.distanceSq(getBattleFieldWidth(), getBattleFieldHeight());
+		eval += (getOthers() > 6 ? 3 : (getOthers()-3))  / p.distanceSq(getBattleFieldWidth()/2, getBattleFieldHeight()/2);
+		double cornerFactor = getOthers() <= 5 ? getOthers() == 1 ? 1 : -0.025 : -0.05;
+		eval += cornerFactor / p.distanceSq(0, 0);
+		eval += cornerFactor / p.distanceSq(getBattleFieldWidth(), 0);
+		eval += cornerFactor / p.distanceSq(0, getBattleFieldHeight());
+		eval += cornerFactor / p.distanceSq(getBattleFieldWidth(), getBattleFieldHeight());
 		
 		if(targetBot.alive){
 			double botangle = Utils.normalRelativeAngle( Utility.calcAngle(p, targetBot) - Utility.calcAngle(me, p));
