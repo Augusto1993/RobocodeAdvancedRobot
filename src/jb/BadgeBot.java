@@ -168,7 +168,7 @@ public class BadgeBot extends AdvancedRobot {
 		    power = Utility.clamp((20 - bspeed) / 3.0, 0.1, 3.0);
 		    break;
 		}
-		//Change the current location to the current one
+		//Change the current location to the current one.
 		shootAt.setLocation(tmpx, tmpy);
 	    } while ((int)Math.round( (shootAt.distance( me) - 18) / Rules.getBulletSpeed( power)) > deltahittime); //Repeat until the bullet distance / speed or velocity >= the time taken. A variation of d=v*t.
 	    shootAt.setLocation(Utility.clamp(tmpx, 34, getBattleFieldWidth() - 34), Utility.clamp(tmpy, 34, getBattleFieldHeight() - 34));
