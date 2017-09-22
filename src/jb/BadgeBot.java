@@ -79,7 +79,8 @@ public class BadgeBot extends AdvancedRobot {
 		if (targetBot.alive)
 		    shooting();
 	    }
-
+	    if(getOthers() == 1)
+		scan();
 	    execute();
 	}
     }
@@ -101,9 +102,11 @@ public class BadgeBot extends AdvancedRobot {
 	en.scanTime = getTime();
 	en.velocity = e.getVelocity();
 	en.bearingRadians = e.getBearingRadians();
-	en.setLocation(new Point2D.Double(me.x + e.getDistance() * Math.sin(getHeadingRadians() + en.bearingRadians), me.y + e.getDistance() * Math.cos(getHeadingRadians() + en.bearingRadians)));
+	en.setLocation(new Point2D.Double(me.x + e.getDistance() * Math.sin(getHeadingRadians() + en.bearingRadians),
+		me.y + e.getDistance() * Math.cos(getHeadingRadians() + en.bearingRadians)));
 	en.heading = e.getHeadingRadians();
-	en.shootableScore = en.energy < 25 ? en.energy < 5 ? en.distance(me) * 0.1 : en.distance(me) * 0.75 : en.distance(me);
+	en.shootableScore = en.energy < 25 ? en.energy < 5 ? en.distance(me) * 0.1 : en.distance(me) * 0.75
+		: en.distance(me);
 
 	// If the target I was shooting at died switch to a new one or if a new
 	// challenger has a lower shootableScore
@@ -131,7 +134,7 @@ public class BadgeBot extends AdvancedRobot {
 	    double dist = me.distance(targetBot);
 	    double power = (dist > 850 ? 0.1 : (dist > 700 ? 0.5 : (dist > 250 ? 2.0 : 3.0)));
 	    power = Math.min(me.energy / 4d, Math.min(targetBot.energy / 3d, power));
-
+	    power = Utility.clamp(power, 0.1, 3.0);
 	    //Circular targeting which also works as linear targeting due to the heading change being 0 in linear
 	    long deltahittime;
 	    Point2D.Double shootAt = new Point2D.Double();
@@ -141,9 +144,9 @@ public class BadgeBot extends AdvancedRobot {
 	    /*
 	     * FROM GREIZEL Robot on the RoboWiki page
 	     */
-	    
+
 	    // Perform an iterations to find a reasonable accurate expected position
-	    
+
 	    //Setting up variables
 	    tmpx = targetBot.getX();
 	    tmpy = targetBot.getY();
@@ -151,7 +154,7 @@ public class BadgeBot extends AdvancedRobot {
 	    chead = head - targetBot.lastHeading;
 	    shootAt.setLocation(tmpx, tmpy);
 	    deltahittime = 0;
-	    
+
 	    do {
 		//Add to x and y based on the velocity
 		tmpx += Math.sin(head) * targetBot.velocity;
@@ -159,7 +162,8 @@ public class BadgeBot extends AdvancedRobot {
 		//For circular targeting the heading will always change in a theoretical universe by the same change in heading
 		head += chead;
 		deltahittime++;
-		Rectangle2D.Double fireField = new Rectangle2D.Double(18, 18, getBattleFieldWidth() - 36, getBattleFieldHeight() - 36);
+		Rectangle2D.Double fireField = new Rectangle2D.Double(18, 18, getBattleFieldWidth() - 36,
+			getBattleFieldHeight() - 36);
 		// if position not in field, adapt
 		if (!fireField.contains(tmpx, tmpy)) {
 		    //The best bullet speed is the distance over the calculated time
@@ -170,14 +174,16 @@ public class BadgeBot extends AdvancedRobot {
 		}
 		//Change the current location to the current one
 		shootAt.setLocation(tmpx, tmpy);
-	    } while ((int)Math.round( (shootAt.distance( me) - 18) / Rules.getBulletSpeed( power)) > deltahittime); //Repeat until the bullet distance / speed or velocity >= the time taken. A variation of d=v*t.
-	    shootAt.setLocation(Utility.clamp(tmpx, 34, getBattleFieldWidth() - 34), Utility.clamp(tmpy, 34, getBattleFieldHeight() - 34));
-	    if ((getGunHeat() == 0.0) && (getGunTurnRemaining() == 0.0) && (power > 0.0) && (getEnergy() > 0.1)) {
+	    } while ((int) Math.round((shootAt.distance(me) - 18) / Rules.getBulletSpeed(power)) > deltahittime); //Repeat until the bullet distance / speed or velocity >= the time taken. A variation of d=v*t.
+	    shootAt.setLocation(Utility.clamp(tmpx, 34, getBattleFieldWidth() - 34),
+		    Utility.clamp(tmpy, 34, getBattleFieldHeight() - 34));
+	    if ((getGunHeat() == 0.0) && (getGunTurnRemaining() == 0.0) && (power > 0.0) && (me.energy > 0.1)) {
 		// Only fire the gun is ready
 		setFire(power);
 	    }
 	    // Turn gun after firing so that the gun is not in an infinitely not ready to fire loop
-	    setTurnGunRightRadians( Utils.normalRelativeAngle(((Math.PI / 2) - Math.atan2( shootAt.y - me.getY(), shootAt.x - me.getX())) - getGunHeadingRadians()));
+	    setTurnGunRightRadians(Utils.normalRelativeAngle(((Math.PI / 2) - Math.atan2(shootAt.y - me.getY(), shootAt.x - me.getX()))
+			    - getGunHeadingRadians()));
 	}
     }
 
@@ -238,12 +244,12 @@ public class BadgeBot extends AdvancedRobot {
     public double evaluatePoint(Point2D.Double p) {
 	// You don't want to stay in one spot. Antigrav from starting point as
 	// init value to enhance movement.
-	double eval = Utility.randomBetween(1, 1.5) / p.distanceSq(me);
+	double eval = Utility.randomBetween(0.75, 2) / p.distanceSq(me);
 	// PRESET ANTIGRAV POINTS
 	// If its a 1v1 the center is fine. You can use getOthers to see if its
 	// a 1v1.
-	eval += (getOthers() > 6 ? 3 : (getOthers() - 3)) / p.distanceSq(getBattleFieldWidth() / 2, getBattleFieldHeight() / 2);
-	double cornerFactor = getOthers() <= 5 ? getOthers() == 1 ? 1 : -0.025 : -0.05;
+	eval += (6*(getOthers() - 1))/ p.distanceSq(getBattleFieldWidth() / 2, getBattleFieldHeight() / 2);
+	double cornerFactor = getOthers() <= 5 ? getOthers() == 1 ? 0.25 : 0.5 : 1;
 	eval += cornerFactor / p.distanceSq(0, 0);
 	eval += cornerFactor / p.distanceSq(getBattleFieldWidth(), 0);
 	eval += cornerFactor / p.distanceSq(0, getBattleFieldHeight());
@@ -259,17 +265,15 @@ public class BadgeBot extends AdvancedRobot {
 		// (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) +
 		// Math.abs(Math.cos(botangle))) / 2) Better to move
 		// perpendicular to the target bot
-		// (1 + Math.abs(Utility.calcAngle(me, targetPoint) -
-		// getHeadingRadians())) If my heading is pointing towards the
-		// enemy its bad
-		eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) + Math.abs(Math.cos(botangle))) / 2) * (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
+		// (1 + Math.abs(Math.cos(Utility.calcAngle(me, p) - Utility.calcAngle(en, p)))) Worse if the enemy is closer to the point than I am in heading
+		eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) + Math.abs(Math.cos(botangle))) / 2) * (1 + Math.abs(Math.cos(Utility.calcAngle(me, p) - Utility.calcAngle(en, p))));
 	    }
 	    return eval;
 	} else if (enemies.values().size() >= 1) {
 	    Iterator<Robot> enemiesIter = enemies.values().iterator();
 	    while (enemiesIter.hasNext()) {
 		Robot en = enemiesIter.next();
-		eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
+		eval += (en.energy / me.energy) * (1 / p.distanceSq(en));
 	    }
 	    return eval;
 	} else {
