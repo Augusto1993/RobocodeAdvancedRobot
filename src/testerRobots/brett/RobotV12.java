@@ -1,4 +1,4 @@
-package brett;
+package testerRobots.brett;
 
 import java.awt.Color;
 import java.awt.Graphics2D;

@@ -1,4 +1,4 @@
-package brett;
+package testerRobots.brett;
 
 public class Robot {
 
