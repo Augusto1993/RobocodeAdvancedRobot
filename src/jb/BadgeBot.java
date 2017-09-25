@@ -32,13 +32,18 @@ public class BadgeBot extends AdvancedRobot {
     List<Point2D.Double> possibleLocations = new ArrayList<>();
     Point2D.Double targetPoint = new Point2D.Double(60, 60);
 
+    Rectangle2D.Double battleField = new Rectangle2D.Double();
+
     int idleTime = 30;
 
     public void run() {
+	battleField.height = getBattleFieldHeight();
+	battleField.width = getBattleFieldWidth();
+
 	if (finishes == null)
 	    finishes = new int[getOthers() + 1];
 
-	setColors(Color.BLACK, Color.RED, Color.BLACK, Color.RED, Color.BLACK);
+	setColors(new Color(28, 98, 219), new Color(28, 212, 219), new Color(131, 0, 255), new Color(255, 0, 0), new Color(255, 255, 255));
 	setAdjustGunForRobotTurn(true);
 	setAdjustRadarForGunTurn(true);
 	setTurnRadarRightRadians(Double.POSITIVE_INFINITY);
@@ -56,6 +61,8 @@ public class BadgeBot extends AdvancedRobot {
 	targetBot.alive = false;
 
 	while (true) {
+	    me.lastHeading = me.heading;
+	    me.heading = getHeadingRadians();
 	    me.x = getX();
 	    me.y = getY();
 	    me.energy = getEnergy();
@@ -68,7 +75,7 @@ public class BadgeBot extends AdvancedRobot {
 		if (getTime() - r.scanTime > 25) {
 		    // If the information is not updated lets just assume its dead so we don't shoot at it
 		    r.alive = false;
-		    if (r.name.equals(targetBot.name))
+		    if (targetBot.name != null && r.name.equals(targetBot.name))
 			targetBot.alive = false;
 		}
 	    }
@@ -79,8 +86,6 @@ public class BadgeBot extends AdvancedRobot {
 		if (targetBot.alive)
 		    shooting();
 	    }
-	    if(getOthers() == 1)
-		scan();
 	    execute();
 	}
     }
@@ -94,6 +99,9 @@ public class BadgeBot extends AdvancedRobot {
 	    en = new Robot();
 	    enemies.put(e.getName(), en);
 	}
+
+	en.bearingRadians = e.getBearingRadians();
+	en.setLocation(new Point2D.Double(me.x + e.getDistance() * Math.sin(getHeadingRadians() + en.bearingRadians), me.y + e.getDistance() * Math.cos(getHeadingRadians() + en.bearingRadians)));
 	// Setting/Updating enemy variables
 	en.lastHeading = en.heading;
 	en.name = e.getName();
@@ -101,22 +109,20 @@ public class BadgeBot extends AdvancedRobot {
 	en.alive = true;
 	en.scanTime = getTime();
 	en.velocity = e.getVelocity();
-	en.bearingRadians = e.getBearingRadians();
-	en.setLocation(new Point2D.Double(me.x + e.getDistance() * Math.sin(getHeadingRadians() + en.bearingRadians),
-		me.y + e.getDistance() * Math.cos(getHeadingRadians() + en.bearingRadians)));
 	en.heading = e.getHeadingRadians();
-	en.shootableScore = en.energy < 25 ? en.energy < 5 ? en.distance(me) * 0.1 : en.distance(me) * 0.75
-		: en.distance(me);
-
-	// If the target I was shooting at died switch to a new one or if a new
-	// challenger has a lower shootableScore
-	if (!targetBot.alive || en.shootableScore < targetBot.shootableScore)
-	    targetBot = en;
+	en.shootableScore = en.energy < 25 ? en.energy < 5 ? en.energy == 0 ? 0 : en.distance(me) * 0.1 : en.distance(me) * 0.75 : en.distance(me);
+	
 	// LOGIC NEEDED FOR 1v1 SUPER SAYAN MODE ACTIVATE
 	if (getOthers() == 1) {
 	    // Nano Bot Lock - Very Simple
 	    setTurnRadarLeftRadians(getRadarTurnRemainingRadians());
 	}
+
+	// If the target I was shooting at died switch to a new one or if a new
+	// challenger has a lower shootableScore
+	if (!targetBot.alive || en.shootableScore * 1.10 < targetBot.shootableScore)
+	    targetBot = en;
+
     }
 
     public void onRobotDeath(RobotDeathEvent event) {
@@ -162,8 +168,7 @@ public class BadgeBot extends AdvancedRobot {
 		//For circular targeting the heading will always change in a theoretical universe by the same change in heading
 		head += chead;
 		deltahittime++;
-		Rectangle2D.Double fireField = new Rectangle2D.Double(18, 18, getBattleFieldWidth() - 36,
-			getBattleFieldHeight() - 36);
+		Rectangle2D.Double fireField = new Rectangle2D.Double(18, 18, getBattleFieldWidth() - 36, getBattleFieldHeight() - 36);
 		// if position not in field, adapt
 		if (!fireField.contains(tmpx, tmpy)) {
 		    //The best bullet speed is the distance over the calculated time
@@ -175,15 +180,13 @@ public class BadgeBot extends AdvancedRobot {
 		//Change the current location to the current one
 		shootAt.setLocation(tmpx, tmpy);
 	    } while ((int) Math.round((shootAt.distance(me) - 18) / Rules.getBulletSpeed(power)) > deltahittime); //Repeat until the bullet distance / speed or velocity >= the time taken. A variation of d=v*t.
-	    shootAt.setLocation(Utility.clamp(tmpx, 34, getBattleFieldWidth() - 34),
-		    Utility.clamp(tmpy, 34, getBattleFieldHeight() - 34));
+	    shootAt.setLocation(Utility.clamp(tmpx, 34, getBattleFieldWidth() - 34), Utility.clamp(tmpy, 34, getBattleFieldHeight() - 34));
 	    if ((getGunHeat() == 0.0) && (getGunTurnRemaining() == 0.0) && (power > 0.0) && (me.energy > 0.1)) {
 		// Only fire the gun is ready
 		setFire(power);
 	    }
 	    // Turn gun after firing so that the gun is not in an infinitely not ready to fire loop
-	    setTurnGunRightRadians(Utils.normalRelativeAngle(((Math.PI / 2) - Math.atan2(shootAt.y - me.getY(), shootAt.x - me.getX()))
-			    - getGunHeadingRadians()));
+	    setTurnGunRightRadians(Utils.normalRelativeAngle(((Math.PI / 2) - Math.atan2(shootAt.y - me.getY(), shootAt.x - me.getX())) - getGunHeadingRadians()));
 	}
     }
 
@@ -248,7 +251,7 @@ public class BadgeBot extends AdvancedRobot {
 	// PRESET ANTIGRAV POINTS
 	// If its a 1v1 the center is fine. You can use getOthers to see if its
 	// a 1v1.
-	eval += (6*(getOthers() - 1))/ p.distanceSq(getBattleFieldWidth() / 2, getBattleFieldHeight() / 2);
+	eval += (6 * (getOthers() - 1)) / p.distanceSq(getBattleFieldWidth() / 2, getBattleFieldHeight() / 2);
 	double cornerFactor = getOthers() <= 5 ? getOthers() == 1 ? 0.25 : 0.5 : 1;
 	eval += cornerFactor / p.distanceSq(0, 0);
 	eval += cornerFactor / p.distanceSq(getBattleFieldWidth(), 0);
@@ -268,18 +271,16 @@ public class BadgeBot extends AdvancedRobot {
 		// (1 + Math.abs(Math.cos(Utility.calcAngle(me, p) - Utility.calcAngle(en, p)))) Worse if the enemy is closer to the point than I am in heading
 		eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) + Math.abs(Math.cos(botangle))) / 2) * (1 + Math.abs(Math.cos(Utility.calcAngle(me, p) - Utility.calcAngle(en, p))));
 	    }
-	    return eval;
 	} else if (enemies.values().size() >= 1) {
 	    Iterator<Robot> enemiesIter = enemies.values().iterator();
 	    while (enemiesIter.hasNext()) {
 		Robot en = enemiesIter.next();
 		eval += (en.energy / me.energy) * (1 / p.distanceSq(en));
 	    }
-	    return eval;
 	} else {
 	    eval += (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
-	    return eval;
 	}
+	return eval;
     }
 
     public double[] normalizeRisk(double[] arr) {
@@ -311,9 +312,11 @@ public class BadgeBot extends AdvancedRobot {
 		g.setColor(new Color(0, 0, 0, 0));
 	    else
 		g.setColor(new Color(255, 50, 0, 255 / 2));
+	    
 	    g.drawRect((int) (e.x - 25), (int) (e.y - 25), 50, 50);
 	}
-	g.fillRect((int) targetPoint.x - 20, (int) targetPoint.y - 20, 40, 40);
+	g.setColor(new Color(255, 0, 0, 255 / 2));
+	g.fillRect((int) (targetPoint.x - 20), (int) (targetPoint.y - 20), 40, 40);
     }
 
     public void onWin(WinEvent e) {
