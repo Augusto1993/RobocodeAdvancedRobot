@@ -2,6 +2,7 @@ package jb;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
@@ -20,7 +21,6 @@ import robocode.util.Utils;
 public class BadgeBot extends AdvancedRobot {
 
     // Static variables or objects in robocode keep their data from round to round
-
     static final int PREDICTION_POINTS = 150;
 
     static int[] finishes;
@@ -43,7 +43,7 @@ public class BadgeBot extends AdvancedRobot {
 	if (finishes == null)
 	    finishes = new int[getOthers() + 1];
 
-	setColors(new Color(28, 98, 219), new Color(28, 212, 219), new Color(131, 0, 255), new Color(255, 0, 0), new Color(255, 255, 255));
+	setColors(new Color(28, 98, 219), new Color(28, 212, 219), new Color(131, 0, 255), new Color(226, 220, 24), new Color(255, 255, 255));
 	setAdjustGunForRobotTurn(true);
 	setAdjustRadarForGunTurn(true);
 	setTurnRadarRightRadians(Double.POSITIVE_INFINITY);
@@ -257,7 +257,7 @@ public class BadgeBot extends AdvancedRobot {
 	eval += cornerFactor / p.distanceSq(getBattleFieldWidth(), 0);
 	eval += cornerFactor / p.distanceSq(0, getBattleFieldHeight());
 	eval += cornerFactor / p.distanceSq(getBattleFieldWidth(), getBattleFieldHeight());
-
+	
 	if (targetBot.alive) {
 	    double botangle = Utils.normalRelativeAngle(Utility.calcAngle(p, targetBot) - Utility.calcAngle(me, p));
 	    Iterator<Robot> enemiesIter = enemies.values().iterator();
