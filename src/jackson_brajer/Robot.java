@@ -1,4 +1,4 @@
-package jb;
+package jackson_brajer;
 
 import java.awt.geom.Point2D;
 

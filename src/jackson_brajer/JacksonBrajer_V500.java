@@ -1,8 +1,7 @@
-package jb;
+package jackson_brajer;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
-import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
@@ -18,22 +17,29 @@ import robocode.ScannedRobotEvent;
 import robocode.WinEvent;
 import robocode.util.Utils;
 
-public class BadgeBot extends AdvancedRobot {
+public class JacksonBrajer_V500 extends AdvancedRobot {
 
     // Static variables or objects in robocode keep their data from round to round
     static final int PREDICTION_POINTS = 150;
 
+    //Keep track of each finish to see how well my robot does FROM ** http://robowiki.net/wiki/Melee_Strategy **
     static int[] finishes;
+    //Keep track of all my enemy and their data for movement and aiming calculations
     HashMap<String, Robot> enemies = new HashMap<>();
 
+    //My own information to limit the get funtion usage and the targetBot to know what I am aiming at after a scan
     Robot me = new Robot();
     Robot targetBot;
 
+    //List of all my possible movement points
     List<Point2D.Double> possibleLocations = new ArrayList<>();
+    //The lowest risked point from the possiblePoints
     Point2D.Double targetPoint = new Point2D.Double(60, 60);
 
+    //To limit getBattleFieldHeight and Width calls
     Rectangle2D.Double battleField = new Rectangle2D.Double();
 
+    //Time before I force a new target point
     int idleTime = 30;
 
     public void run() {
@@ -43,11 +49,13 @@ public class BadgeBot extends AdvancedRobot {
 	if (finishes == null)
 	    finishes = new int[getOthers() + 1];
 
+	//Need to make my robot a nice colour. The better the skins the better the wins
 	setColors(new Color(28, 98, 219), new Color(28, 212, 219), new Color(131, 0, 255), new Color(226, 220, 24), new Color(255, 255, 255));
 	setAdjustGunForRobotTurn(true);
 	setAdjustRadarForGunTurn(true);
 	setTurnRadarRightRadians(Double.POSITIVE_INFINITY);
 
+	//Initial variable update
 	me.x = getX();
 	me.y = getY();
 	me.energy = getEnergy();
@@ -61,6 +69,7 @@ public class BadgeBot extends AdvancedRobot {
 	targetBot.alive = false;
 
 	while (true) {
+	    //Update my variables every loop call
 	    me.lastHeading = me.heading;
 	    me.heading = getHeadingRadians();
 	    me.x = getX();
@@ -100,9 +109,9 @@ public class BadgeBot extends AdvancedRobot {
 	    enemies.put(e.getName(), en);
 	}
 
+	// Setting/Updating enemy variables
 	en.bearingRadians = e.getBearingRadians();
 	en.setLocation(new Point2D.Double(me.x + e.getDistance() * Math.sin(getHeadingRadians() + en.bearingRadians), me.y + e.getDistance() * Math.cos(getHeadingRadians() + en.bearingRadians)));
-	// Setting/Updating enemy variables
 	en.lastHeading = en.heading;
 	en.name = e.getName();
 	en.energy = e.getEnergy();
@@ -110,7 +119,8 @@ public class BadgeBot extends AdvancedRobot {
 	en.scanTime = getTime();
 	en.velocity = e.getVelocity();
 	en.heading = e.getHeadingRadians();
-	en.shootableScore = en.energy < 25 ? en.energy < 5 ? en.energy == 0 ? 0 : en.distance(me) * 0.1 : en.distance(me) * 0.75 : en.distance(me);
+	//Based on robot distance and energy chose my best enemy to shoot at
+	en.shootableScore = en.energy < 25 ? en.energy < 5 ? en.energy == 0 ? Double.MIN_VALUE : en.distance(me) * 0.1 : en.distance(me) * 0.75 : en.distance(me);
 	
 	// LOGIC NEEDED FOR 1v1 SUPER SAYAN MODE ACTIVATE
 	if (getOthers() == 1) {
@@ -118,9 +128,8 @@ public class BadgeBot extends AdvancedRobot {
 	    setTurnRadarLeftRadians(getRadarTurnRemainingRadians());
 	}
 
-	// If the target I was shooting at died switch to a new one or if a new
-	// challenger has a lower shootableScore
-	if (!targetBot.alive || en.shootableScore * 1.10 < targetBot.shootableScore)
+	// If the target I was shooting at died switch to a new one or if a new challenger has a lower shootableScore
+	if (!targetBot.alive || en.shootableScore < targetBot.shootableScore)
 	    targetBot = en;
 
     }
@@ -136,11 +145,11 @@ public class BadgeBot extends AdvancedRobot {
 
     public void shooting() {
 	if (targetBot != null && targetBot.alive) {
-	    // It works I guess
 	    double dist = me.distance(targetBot);
 	    double power = (dist > 850 ? 0.1 : (dist > 700 ? 0.5 : (dist > 250 ? 2.0 : 3.0)));
 	    power = Math.min(me.energy / 4d, Math.min(targetBot.energy / 3d, power));
 	    power = Utility.clamp(power, 0.1, 3.0);
+	    
 	    //Circular targeting which also works as linear targeting due to the heading change being 0 in linear
 	    long deltahittime;
 	    Point2D.Double shootAt = new Point2D.Double();
@@ -151,8 +160,6 @@ public class BadgeBot extends AdvancedRobot {
 	     * FROM GREIZEL Robot on the RoboWiki page
 	     */
 
-	    // Perform an iterations to find a reasonable accurate expected position
-
 	    //Setting up variables
 	    tmpx = targetBot.getX();
 	    tmpy = targetBot.getY();
@@ -160,16 +167,16 @@ public class BadgeBot extends AdvancedRobot {
 	    chead = head - targetBot.lastHeading;
 	    shootAt.setLocation(tmpx, tmpy);
 	    deltahittime = 0;
-
+	    
 	    do {
-		//Add to x and y based on the velocity
+		//Add to x and y based on the velocity and the heading
 		tmpx += Math.sin(head) * targetBot.velocity;
 		tmpy += Math.cos(head) * targetBot.velocity;
 		//For circular targeting the heading will always change in a theoretical universe by the same change in heading
 		head += chead;
 		deltahittime++;
-		Rectangle2D.Double fireField = new Rectangle2D.Double(18, 18, getBattleFieldWidth() - 36, getBattleFieldHeight() - 36);
-		// if position not in field, adapt
+		Rectangle2D.Double fireField = new Rectangle2D.Double(18, 18, battleField.width - 36, battleField.height - 36);
+		// if position not in field shoot at the current best location
 		if (!fireField.contains(tmpx, tmpy)) {
 		    //The best bullet speed is the distance over the calculated time
 		    bspeed = shootAt.distance(me) / deltahittime;
@@ -196,7 +203,6 @@ public class BadgeBot extends AdvancedRobot {
 	    idleTime = 0;
 	    // Get a new array of points
 	    updateListLocations(PREDICTION_POINTS);
-
 	    // Lowest Risk Point
 	    Point2D.Double lowRiskP = null;
 	    // Current Risk Value
@@ -217,12 +223,13 @@ public class BadgeBot extends AdvancedRobot {
 	    // GO TO POINT
 	    double angle = Utility.calcAngle(me, targetPoint) - getHeadingRadians();
 	    double direction = 1;
+	    //If Math.cos(angle) is negative its faster to go backwards and turn than going forwards and turn much more
 	    if (Math.cos(angle) < 0) {
+		//Math.PI in radians is half so changing the turn by 180
 		angle += Math.PI;
 		direction *= -1;
 	    }
-	    // If Math.cos(angle) is negative its faster to go backwards and
-	    // turn than going forwards and turn much more
+	    //Increase velocity as my remaining amount to turn becomes less
 	    setMaxVelocity(10 - (4 * Math.abs(getTurnRemainingRadians())));
 	    setAhead(me.distance(targetPoint) * direction);
 	    angle = Utils.normalRelativeAngle(angle);
@@ -236,10 +243,11 @@ public class BadgeBot extends AdvancedRobot {
 	// Create x points in a radius pixel radius around the bot
 	for (int i = 0; i < n; i++) {
 	    double randXMod = Utility.randomBetween(-radius, radius);
+	    //yRange is dependant on the x current value to create a circle
 	    double yRange = Math.sqrt(radius * radius - randXMod * randXMod);
 	    double randYMod = Utility.randomBetween(-yRange, yRange);
-	    double y = Utility.clamp(me.y + randYMod, 75, getBattleFieldHeight() - 75);
-	    double x = Utility.clamp(me.x + randXMod, 75, getBattleFieldWidth() - 75);
+	    double y = Utility.clamp(me.y + randYMod, 75, battleField.height - 75);
+	    double x = Utility.clamp(me.x + randXMod, 75, battleField.width - 75);
 	    possibleLocations.add(new Point2D.Double(x, y));
 	}
     }
@@ -249,14 +257,13 @@ public class BadgeBot extends AdvancedRobot {
 	// init value to enhance movement.
 	double eval = Utility.randomBetween(0.75, 2) / p.distanceSq(me);
 	// PRESET ANTIGRAV POINTS
-	// If its a 1v1 the center is fine. You can use getOthers to see if its
-	// a 1v1.
-	eval += (6 * (getOthers() - 1)) / p.distanceSq(getBattleFieldWidth() / 2, getBattleFieldHeight() / 2);
+	// If its a 1v1 the center is fine. You can use getOthers to see if its a 1v1.
+	eval += (6 * (getOthers() - 1)) / p.distanceSq(battleField.width / 2, battleField.height / 2);
 	double cornerFactor = getOthers() <= 5 ? getOthers() == 1 ? 0.25 : 0.5 : 1;
 	eval += cornerFactor / p.distanceSq(0, 0);
-	eval += cornerFactor / p.distanceSq(getBattleFieldWidth(), 0);
-	eval += cornerFactor / p.distanceSq(0, getBattleFieldHeight());
-	eval += cornerFactor / p.distanceSq(getBattleFieldWidth(), getBattleFieldHeight());
+	eval += cornerFactor / p.distanceSq(battleField.width, 0);
+	eval += cornerFactor / p.distanceSq(0, battleField.height);
+	eval += cornerFactor / p.distanceSq(battleField.width, battleField.height);
 	
 	if (targetBot.alive) {
 	    double botangle = Utils.normalRelativeAngle(Utility.calcAngle(p, targetBot) - Utility.calcAngle(me, p));
@@ -265,9 +272,7 @@ public class BadgeBot extends AdvancedRobot {
 		Robot en = enemiesIter.next();
 		// (1 / p.distanceSq(en)) AntiGrav stuff
 		// (en.energy / me.energy) How dangerous a robot it
-		// (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) +
-		// Math.abs(Math.cos(botangle))) / 2) Better to move
-		// perpendicular to the target bot
+		// (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) + Math.abs(Math.cos(botangle))) / 2) Better to move perpendicular to the target bot
 		// (1 + Math.abs(Math.cos(Utility.calcAngle(me, p) - Utility.calcAngle(en, p)))) Worse if the enemy is closer to the point than I am in heading
 		eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1.0 + ((1 - (Math.abs(Math.sin(botangle)))) + Math.abs(Math.cos(botangle))) / 2) * (1 + Math.abs(Math.cos(Utility.calcAngle(me, p) - Utility.calcAngle(en, p))));
 	    }
@@ -275,7 +280,7 @@ public class BadgeBot extends AdvancedRobot {
 	    Iterator<Robot> enemiesIter = enemies.values().iterator();
 	    while (enemiesIter.hasNext()) {
 		Robot en = enemiesIter.next();
-		eval += (en.energy / me.energy) * (1 / p.distanceSq(en));
+		eval += (en.energy / me.energy) * (1 / p.distanceSq(en)) * (1 + Math.abs(Math.cos(Utility.calcAngle(me, p) - Utility.calcAngle(en, p))));
 	    }
 	} else {
 	    eval += (1 + Math.abs(Utility.calcAngle(me, targetPoint) - getHeadingRadians()));
