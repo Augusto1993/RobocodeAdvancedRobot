@@ -239,7 +239,7 @@ public class JacksonBrajer_V500 extends AdvancedRobot {
 
     public void updateListLocations(int n) {
 	possibleLocations.clear();
-	final int radius = 125;
+	final int radius = (int) (125*1.5);
 	// Create x points in a radius pixel radius around the bot
 	for (int i = 0; i < n; i++) {
 	    double randXMod = Utility.randomBetween(-radius, radius);
